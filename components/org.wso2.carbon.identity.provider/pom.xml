@@ -116,6 +116,10 @@
             <artifactId>encoder</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.owasp.esapi</groupId>
+            <artifactId>esapi</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.wso2.tomcat</groupId>
             <artifactId>tomcat-servlet-api</artifactId>
         </dependency>
@@ -199,7 +203,8 @@
                             !org.wso2.carbon.identity.provider.internal,
                             org.wso2.carbon.identity.provider.*; version="${identity.inbound.auth.openid.exp.pkg.version}"
                         </Export-Package>
-                        <Embed-Dependency>opensaml;inline=false</Embed-Dependency>
+                        <Embed-Dependency>opensaml;inline=false, esapi;inline=false</Embed-Dependency>
+                        <DynamicImport-Package>*</DynamicImport-Package>
                     </instructions>
                 </configuration>
             </plugin>

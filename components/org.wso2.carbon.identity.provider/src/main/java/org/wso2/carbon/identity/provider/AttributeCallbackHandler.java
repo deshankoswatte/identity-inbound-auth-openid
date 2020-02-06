@@ -28,11 +28,13 @@ import org.apache.rahas.impl.util.SAMLAttributeCallback;
 import org.apache.rahas.impl.util.SAMLCallback;
 import org.apache.rahas.impl.util.SAMLCallbackHandler;
 import org.opensaml.Configuration;
+import org.opensaml.DefaultBootstrap;
 import org.opensaml.SAMLAttribute;
 import org.opensaml.SAMLException;
 import org.opensaml.common.SAMLObjectBuilder;
 import org.opensaml.saml2.core.Attribute;
 import org.opensaml.saml2.core.AttributeValue;
+import org.opensaml.xml.ConfigurationException;
 import org.opensaml.xml.XMLObjectBuilderFactory;
 import org.opensaml.xml.schema.XSString;
 import org.opensaml.xml.schema.impl.XSStringBuilder;
@@ -73,6 +75,7 @@ public class AttributeCallbackHandler implements SAMLCallbackHandler {
     protected Map<String, String> requestedClaimValues = new HashMap<String, String>();
     protected Map<String, Claim> supportedClaims = new HashMap<String, Claim>();
     private String userAttributeSeparator = IdentityCoreConstants.MULTI_ATTRIBUTE_SEPARATOR_DEFAULT;
+    private static boolean bootstrapped = false;
 
     @Override
     public void handle(SAMLCallback callback) throws SAMLException {
@@ -182,12 +185,14 @@ public class AttributeCallbackHandler implements SAMLCallbackHandler {
         }
     }
 
-    private Attribute getSAML2Attribute(String name, String value, String namespace) {
+    private Attribute getSAML2Attribute(String name, String value, String namespace) throws IdentityProviderException {
         XMLObjectBuilderFactory builderFactory = null;
         SAMLObjectBuilder<Attribute> attrBuilder = null;
         Attribute attribute = null;
         XSStringBuilder attributeValueBuilder = null;
         XSString stringValue = null;
+
+        doBootstrap();
 
         builderFactory = Configuration.getBuilderFactory();
         attrBuilder = (SAMLObjectBuilder<Attribute>) builderFactory.getBuilder(Attribute.DEFAULT_ELEMENT_NAME);
@@ -352,7 +357,12 @@ public class AttributeCallbackHandler implements SAMLCallbackHandler {
         try {
             if (MapUtils.isEmpty(requestedClaimValues)) {
                 try {
-                    if(!authenticatedUser.isFederatedUser()) {
+                    if (authenticatedUser == null) {
+                        connector = IdentityTenantUtil.getRealm(null, userId).
+                                getUserStoreManager();
+                        mapValues = connector.getUserClaimValues(MultitenantUtils.getTenantAwareUsername(userId),
+                                claimList.toArray(claimArray), null);
+                    } else if (!authenticatedUser.isFederatedUser()) {
                         if (log.isDebugEnabled()) {
                             log.debug("Loading claim values from local UserStore for user: "
                                     + authenticatedUser.toString());
@@ -429,6 +439,25 @@ public class AttributeCallbackHandler implements SAMLCallbackHandler {
 
     protected RequestedClaimData getRequestedClaim() {
         return new RequestedClaimData();
+    }
+
+    /**
+     * Initializes the OpenSAML2 library.
+     *
+     * @throws IdentityProviderException if there is an error while initializing the library.
+     */
+    private static void doBootstrap() throws IdentityProviderException {
+
+        if (!bootstrapped) {
+            try {
+                DefaultBootstrap.bootstrap();
+            } catch (ConfigurationException e) {
+                log.error("Error while bootstrapping the OpenSAML2 library.", e);
+                throw new IdentityProviderException("Error while bootstrapping the OpenSAML2 library.", e);
+            }
+
+            bootstrapped = true;
+        }
     }
 
 }
